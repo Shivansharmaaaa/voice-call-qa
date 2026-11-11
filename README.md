@@ -4,6 +4,8 @@ Rule-based quality checks for voice-agent call transcripts, where **each agent d
 
 > Independent demo built by Shivansh Sharma as a sample for Hunar.AI's domain (conversational voice agents for frontline hiring). Not affiliated with or endorsed by Hunar.AI. All calls in this repo are synthetic; the company name in them ("Kaam Connect") is made up.
 
+**Live dashboard (static snapshot of the 120 synthetic calls):** https://shivansharmaaaa.github.io/voice-call-qa/
+
 ## What it does
 
 A voice agent can sound fine and still drift: it skips a screening question, asks two things in one breath, repeats itself, hangs up early, or slips out of its language persona. Each slip is rare, so it hides inside averages.
