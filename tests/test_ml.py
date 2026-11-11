@@ -117,3 +117,10 @@ def test_ml_beats_rules_on_paraphrased_calls():
     assert para["hybrid"]["flow_f1"] >= 0.8
     assert para["hybrid"]["flow_f1"] > para["phrase"]["flow_f1"] + 0.3
     assert cmp["template"]["hybrid"]["flow_f1"] >= 0.98
+
+
+def test_shipped_benchmark_cache_matches_a_fresh_run():
+    import json
+    from callqa.evaluate import CACHE, full_benchmark
+    assert CACHE.exists(), "run: python -m callqa.evaluate"
+    assert json.loads(CACHE.read_text(encoding="utf-8")) == json.loads(json.dumps(full_benchmark(load_dir(ROOT / "agents"))))

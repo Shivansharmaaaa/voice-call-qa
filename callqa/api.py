@@ -26,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .engine import score_call
-from .evaluate import compare_matchers, evaluate
+from .evaluate import CACHE, full_benchmark
 from .ml import load_model
 from .models import AgentSpec, Call, Turn
 from .spec import SpecError, load_spec_text
@@ -127,7 +127,12 @@ class Demo:
 
     @cached_property
     def benchmark(self) -> dict:
-        return {**evaluate(self.samples, self.specs), "matchers": compare_matchers(self.specs), "models": self.models}
+        # Precomputed by `python -m callqa.evaluate` (a test checks it matches a fresh run), so the
+        # serverless function doesn't spend seconds re-scoring 720 calls on a cold start.
+        if CACHE.exists():
+            import json
+            return json.loads(CACHE.read_text(encoding="utf-8"))
+        return full_benchmark(self.specs)
 
     @property
     def models(self) -> dict:

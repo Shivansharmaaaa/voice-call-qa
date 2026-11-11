@@ -14,6 +14,13 @@ from .spec import load_dir
 from .synth import generate
 
 ROOT = Path(__file__).resolve().parent.parent
+CACHE = Path(__file__).resolve().parent / "benchmark_cache.json"  # served by the API; tests keep it in sync
+
+
+def full_benchmark(specs) -> dict:
+    from .ml import load_model
+    return {**evaluate(generate(), specs), "matchers": compare_matchers(specs),
+            "models": {a: m.meta for a in specs if (m := load_model(a))}}
 
 
 def evaluate(samples, specs) -> dict:
@@ -89,6 +96,8 @@ def main() -> None:
                   f"{r['flow_precision']:>10.2f} {r['flow_recall']:>7.2f} {r['flow_f1']:>6.2f}")
     (ROOT / "docs").mkdir(exist_ok=True)
     (ROOT / "docs" / "benchmark.json").write_text(json.dumps({**result, "matchers": cmp}, indent=2))
+    CACHE.write_text(json.dumps(full_benchmark(specs), indent=1, ensure_ascii=False), encoding="utf-8")
+    print(f"\nwrote {CACHE.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

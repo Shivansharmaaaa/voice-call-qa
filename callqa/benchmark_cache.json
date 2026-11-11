@@ -1,0 +1,286 @@
+{
+ "calls": 120,
+ "per_finding": {
+  "coverage:skipped_step": {
+   "tp": 16,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0
+  },
+  "early_exit:early_exit": {
+   "tp": 22,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0
+  },
+  "language:off_persona": {
+   "tp": 15,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0
+  },
+  "latency:slow_response": {
+   "tp": 16,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0
+  },
+  "one_question:multiple_questions": {
+   "tp": 21,
+   "fp": 0,
+   "fn": 2,
+   "precision": 1.0,
+   "recall": 0.913
+  },
+  "order:out_of_order": {
+   "tp": 24,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0
+  },
+  "repeats:repeat": {
+   "tp": 18,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0
+  }
+ },
+ "must_not_flag": {
+  "restart": {
+   "planted": 23,
+   "wrongly_flagged": 0
+  },
+  "caller_asked": {
+   "planted": 21,
+   "wrongly_flagged": 0
+  },
+  "compliance": {
+   "planted": 16,
+   "wrongly_flagged": 0
+  },
+  "hangup": {
+   "planted": 13,
+   "wrongly_flagged": 0
+  }
+ },
+ "matchers": {
+  "template": {
+   "phrase": {
+    "flow_tp": 62,
+    "flow_fp": 0,
+    "flow_fn": 0,
+    "flow_precision": 1.0,
+    "flow_recall": 1.0,
+    "flow_f1": 1.0,
+    "per_finding": {
+     "coverage:skipped_step": {
+      "tp": 16,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     },
+     "order:out_of_order": {
+      "tp": 24,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     },
+     "early_exit:early_exit": {
+      "tp": 22,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     }
+    }
+   },
+   "ml": {
+    "flow_tp": 61,
+    "flow_fp": 2,
+    "flow_fn": 1,
+    "flow_precision": 0.968,
+    "flow_recall": 0.984,
+    "flow_f1": 0.976,
+    "per_finding": {
+     "coverage:skipped_step": {
+      "tp": 16,
+      "fp": 2,
+      "fn": 0,
+      "precision": 0.889,
+      "recall": 1.0
+     },
+     "order:out_of_order": {
+      "tp": 23,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.958
+     },
+     "early_exit:early_exit": {
+      "tp": 22,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     }
+    }
+   },
+   "hybrid": {
+    "flow_tp": 62,
+    "flow_fp": 0,
+    "flow_fn": 0,
+    "flow_precision": 1.0,
+    "flow_recall": 1.0,
+    "flow_f1": 1.0,
+    "per_finding": {
+     "coverage:skipped_step": {
+      "tp": 16,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     },
+     "order:out_of_order": {
+      "tp": 24,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     },
+     "early_exit:early_exit": {
+      "tp": 22,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     }
+    }
+   }
+  },
+  "paraphrased": {
+   "phrase": {
+    "flow_tp": 35,
+    "flow_fp": 105,
+    "flow_fn": 27,
+    "flow_precision": 0.25,
+    "flow_recall": 0.565,
+    "flow_f1": 0.347,
+    "per_finding": {
+     "coverage:skipped_step": {
+      "tp": 13,
+      "fp": 59,
+      "fn": 3,
+      "precision": 0.181,
+      "recall": 0.812
+     },
+     "order:out_of_order": {
+      "tp": 0,
+      "fp": 7,
+      "fn": 24,
+      "precision": 0.0,
+      "recall": 0.0
+     },
+     "early_exit:early_exit": {
+      "tp": 22,
+      "fp": 39,
+      "fn": 0,
+      "precision": 0.361,
+      "recall": 1.0
+     }
+    }
+   },
+   "ml": {
+    "flow_tp": 59,
+    "flow_fp": 14,
+    "flow_fn": 3,
+    "flow_precision": 0.808,
+    "flow_recall": 0.952,
+    "flow_f1": 0.874,
+    "per_finding": {
+     "coverage:skipped_step": {
+      "tp": 16,
+      "fp": 14,
+      "fn": 0,
+      "precision": 0.533,
+      "recall": 1.0
+     },
+     "order:out_of_order": {
+      "tp": 21,
+      "fp": 0,
+      "fn": 3,
+      "precision": 1.0,
+      "recall": 0.875
+     },
+     "early_exit:early_exit": {
+      "tp": 22,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     }
+    }
+   },
+   "hybrid": {
+    "flow_tp": 59,
+    "flow_fp": 14,
+    "flow_fn": 3,
+    "flow_precision": 0.808,
+    "flow_recall": 0.952,
+    "flow_f1": 0.874,
+    "per_finding": {
+     "coverage:skipped_step": {
+      "tp": 16,
+      "fp": 14,
+      "fn": 0,
+      "precision": 0.533,
+      "recall": 1.0
+     },
+     "order:out_of_order": {
+      "tp": 21,
+      "fp": 0,
+      "fn": 3,
+      "precision": 1.0,
+      "recall": 0.875
+     },
+     "early_exit:early_exit": {
+      "tp": 22,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+     }
+    }
+   }
+  }
+ },
+ "models": {
+  "field-sales-screener": {
+   "trained_sentences": 85,
+   "augmented_rows": 340,
+   "features": 2522,
+   "cv_accuracy": 0.824,
+   "heldout_accuracy": 1.0,
+   "heldout_sentences": 28,
+   "threshold": 0.2,
+   "algorithm": "char 2-4-gram TF-IDF + logistic regression"
+  },
+  "rider-onboarding-hindi": {
+   "trained_sentences": 66,
+   "augmented_rows": 264,
+   "features": 2304,
+   "cv_accuracy": 0.653,
+   "heldout_accuracy": 0.958,
+   "heldout_sentences": 24,
+   "threshold": 0.25,
+   "algorithm": "char 2-4-gram TF-IDF + logistic regression"
+  }
+ }
+}

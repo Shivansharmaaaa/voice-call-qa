@@ -119,7 +119,7 @@ On paraphrased calls the rules raise 105 false alarms, mostly "skipped step" for
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q                               # 42 tests (+1 Postgres test, see below)
+pytest -q                               # 43 tests (+1 Postgres test, see below)
 python -m callqa.evaluate               # benchmark, including rules vs model
 python ml/train.py                      # optional: retrain the step classifiers
 cd web && npm install && npm test && npm run build  # 7 frontend tests, then the React app -> web/dist
@@ -188,7 +188,7 @@ Two things the benchmark did teach:
 ## Testing status
 
 Run on macOS, Python 3.14:
-- `pytest -q`: 42 tests pass (each check and exemption, two questions swapped inside one turn, spec validation, every API endpoint including edited-spec and matcher overrides and paraphrased generation, rate limiting, read-only vs database mode on SQLite, nothing built at import, benchmark floors; and for the model: parity with scikit-learn, no train/test overlap, serving without scikit-learn or numpy, fallback when no model exists, and rules + model beating rules on paraphrased calls).
+- `pytest -q`: 43 tests pass (each check and exemption, two questions swapped inside one turn, spec validation, every API endpoint including edited-spec and matcher overrides and paraphrased generation, rate limiting, read-only vs database mode on SQLite, nothing built at import, benchmark floors, the shipped benchmark cache matching a fresh run; and for the model: parity with scikit-learn, no train/test overlap, serving without scikit-learn or numpy, fallback when no model exists, and rules + model beating rules on paraphrased calls).
 - Database mode on **Postgres 15**: `CALLQA_TEST_PG=postgresql+psycopg://user@host:port/db pytest -q` runs one more test (store, replace, read back, check the rows in SQL). It passed against a local Postgres 15; it is skipped when the variable isn't set. Needs `pip install "psycopg[binary]"`.
 - `npm test`: 7 frontend tests pass (Vitest + Testing Library: findings pinned to the right turn, silence markers, call-level findings, planted-vs-found panel, model-match badges, routing helpers).
 - `npm run build`: TypeScript type-check and production build pass.
