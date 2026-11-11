@@ -15,6 +15,7 @@ export interface Finding {
   severity: "fail" | "warn" | "info";
   detail: string;
   turn: number | null;
+  step?: string | null;
 }
 
 export interface CallInput {

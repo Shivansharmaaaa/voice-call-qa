@@ -141,3 +141,19 @@ def test_hindi_persona_flags_an_english_turn_but_still_counts_the_step():
 def test_spec_and_call_must_match():
     with pytest.raises(ValueError):
         score_call(build(SALES_SCRIPT), RIDER)
+
+
+def test_two_steps_swapped_inside_one_turn():
+    lines = list(SALES_SCRIPT)
+    # salary asked before notice period, in a single turn
+    lines[10:14] = [("agent", "Aapki current salary kitni hai? Aur aapka notice period kitna hai?"), ("user", "Pandrah hazaar, ek mahina")]
+    r = score_call(build(lines), SALES)
+    order = [f for f in r.findings if f.code == "out_of_order"]
+    assert order and order[0].step == "salary" and "same turn" in order[0].detail  # salary came too early
+
+
+def test_flow_findings_carry_the_step_id():
+    lines = [l for l in SALES_SCRIPT if "notice period" not in l[1]]
+    lines.remove(("user", "Ek mahina"))
+    skipped = [f for f in score_call(build(lines), SALES).findings if f.code == "skipped_step"]
+    assert [f.step for f in skipped] == ["notice_period"]

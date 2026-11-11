@@ -117,9 +117,9 @@ export function About() {
         <ul>
           <li>Python rule engine: 7 checks, each a pure function over a transcript.</li>
           <li>FastAPI service; the hosted demo runs as a serverless function and scores 120 synthetic calls in memory.</li>
-          <li>Optional SQLAlchemy storage (SQLite or Postgres) when self-hosted.</li>
+          <li>Optional SQLAlchemy storage (SQLite or Postgres, both tested) when self-hosted.</li>
           <li>React + TypeScript front end.</li>
-          <li>Synthetic call generator with planted faults, used for the benchmark and the playground. 26 automated tests.</li>
+          <li>Synthetic call generator with planted faults, used for the benchmark and the playground. 31 Python tests (plus one against Postgres) and 6 front-end tests.</li>
         </ul>
       </div>
       <div className="card">

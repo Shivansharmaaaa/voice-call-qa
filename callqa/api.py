@@ -1,7 +1,9 @@
 """HTTP API (everything under /api) plus the built web app at /.
 
-Local:  uvicorn callqa.api:app --reload
-Hosted: api/index.py exposes the same app as a Vercel serverless function.
+Local:  uvicorn --factory callqa.api:create_app
+Hosted: api/index.py builds the same app as a Vercel serverless function.
+
+Nothing is built at import time: create_app() generates and scores the demo data.
 
 The 120 synthetic demo calls are generated and scored in memory at start-up, so the
 app works with no database. Set CALLQA_DB to also persist calls posted to /api/calls.
@@ -11,13 +13,15 @@ from __future__ import annotations
 import html
 import os
 import random
+import time
+from collections import defaultdict, deque
 from dataclasses import asdict
 from functools import cached_property
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -49,7 +53,7 @@ FAULT_INFO = {
 
 class TurnIn(BaseModel):
     speaker: str = Field(pattern="^(agent|user)$")
-    text: str = Field(max_length=2000)
+    text: str = Field(max_length=1000)
     start: float = Field(ge=0)
     end: float = Field(ge=0)
     interrupted: bool = False
@@ -59,18 +63,45 @@ class CallIn(BaseModel):
     id: str = Field(default="playground", min_length=1, max_length=120)
     agent_id: str
     ended_by: str = Field(default="agent", pattern="^(agent|user|system)$")
-    turns: list[TurnIn] = Field(min_length=1, max_length=400)
+    turns: list[TurnIn] = Field(min_length=1, max_length=200)
 
 
 class ScoreIn(BaseModel):
     call: CallIn
-    spec_yaml: str | None = Field(default=None, max_length=50_000)  # optional edited spec to score against
+    spec_yaml: str | None = Field(default=None, max_length=20_000)  # optional edited spec to score against
 
 
 class GenerateIn(BaseModel):
     agent_id: str
     faults: list[str] = []
     seed: int | None = None
+
+
+class RateLimiter:
+    """Sliding-window limit per client IP. In-memory, so on serverless each instance counts separately:
+    it stops one client hammering an instance, it is not a global quota."""
+
+    def __init__(self, limit: int, window_s: float = 60.0):
+        self.limit, self.window = limit, window_s
+        self.hits: dict[str, deque] = defaultdict(deque)
+
+    def allow(self, key: str, now: float | None = None) -> bool:
+        now = time.monotonic() if now is None else now
+        q = self.hits[key]
+        while q and now - q[0] > self.window:
+            q.popleft()
+        if len(q) >= self.limit:
+            return False
+        q.append(now)
+        if len(self.hits) > 10_000:  # forget idle clients so memory stays bounded
+            for k in [k for k, v in self.hits.items() if not v][:5_000]:
+                del self.hits[k]
+        return True
+
+
+def client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
 
 
 class Demo:
@@ -105,13 +136,20 @@ def _to_call(body: CallIn) -> Call:
 
 
 def create_app(db_url: str | None = None, agents_dir: Path = ROOT / "agents",
-               web_dir: Path | None = ROOT / "web" / "dist") -> FastAPI:
+               web_dir: Path | None = ROOT / "web" / "dist", writes_per_minute: int = 60) -> FastAPI:
     demo = Demo(agents_dir)
     db_url = db_url or os.environ.get("CALLQA_DB")
     store = Store(db_url) if db_url else None
     app = FastAPI(title="Voice call QA", version="0.2.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
     app.state.demo, app.state.store = demo, store
+    limiter = RateLimiter(writes_per_minute)
+
+    @app.middleware("http")
+    async def limit_posts(request: Request, call_next):
+        if request.method == "POST" and request.url.path.startswith("/api/") and not limiter.allow(client_ip(request)):
+            return JSONResponse({"detail": "too many requests, try again in a minute"}, status_code=429)
+        return await call_next(request)
 
     def all_calls(agent_id: str | None = None) -> list[dict]:
         calls = [c for c in demo.calls.values() if not agent_id or c["agent_id"] == agent_id]
@@ -251,6 +289,3 @@ section{{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;ma
 table{{border-collapse:collapse;width:100%}}td,th{{border-bottom:1px solid #eee;padding:6px;text-align:left}}
 code{{font-size:12px}}</style></head><body><h1>Voice call QA</h1>
 <p>Synthetic demo data. Each agent shows only the checks its own spec turns on.</p>{''.join(sections)}</body></html>"""
-
-
-app = create_app()

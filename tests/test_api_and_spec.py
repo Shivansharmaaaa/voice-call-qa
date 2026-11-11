@@ -107,3 +107,45 @@ def test_benchmark_floor():
         assert row["precision"] >= 0.95, key
         assert row["recall"] >= 0.85, key
     assert all(v["wrongly_flagged"] == 0 for v in result["must_not_flag"].values())
+
+
+def test_importing_the_api_builds_nothing():
+    import importlib
+    import callqa.api as mod
+    importlib.reload(mod)
+    assert not hasattr(mod, "app")
+
+
+def test_rate_limiter_window():
+    from callqa.api import RateLimiter
+    rl = RateLimiter(limit=2, window_s=60)
+    assert rl.allow("a", now=0) and rl.allow("a", now=1)
+    assert not rl.allow("a", now=2)
+    assert rl.allow("b", now=2)
+    assert rl.allow("a", now=62)
+
+
+def test_posts_are_rate_limited_per_client():
+    c = TestClient(create_app(web_dir=None, writes_per_minute=3))
+    body = {"agent_id": "field-sales-screener", "faults": []}
+    codes = [c.post("/api/generate", json=body, headers={"x-forwarded-for": "1.2.3.4"}).status_code for _ in range(4)]
+    assert codes == [200, 200, 200, 429]
+    assert c.post("/api/generate", json=body, headers={"x-forwarded-for": "5.6.7.8"}).status_code == 200
+    assert c.get("/api/health").status_code == 200  # reads are not limited
+
+
+@pytest.mark.skipif(not __import__("os").environ.get("CALLQA_TEST_PG"), reason="set CALLQA_TEST_PG to a Postgres URL")
+def test_database_mode_on_postgres():
+    import os
+    from sqlalchemy import create_engine, text
+    url = os.environ["CALLQA_TEST_PG"]
+    c = TestClient(create_app(db_url=url, web_dir=None))
+    call = asdict(generate(n_per_agent=1, seed=2)[0].call) | {"id": "pg-test-1"}
+    assert c.post("/api/calls", json=call).status_code == 200
+    assert c.post("/api/calls", json=call).status_code == 200  # replace, not duplicate
+    assert c.get("/api/calls/pg-test-1").json()["source"] == "stored"
+    with create_engine(url).connect() as conn:
+        assert conn.execute(text("select count(*) from calls where id = 'pg-test-1'")).scalar() == 1
+        conn.execute(text("delete from findings where call_id = 'pg-test-1'"))
+        conn.execute(text("delete from calls where id = 'pg-test-1'"))
+        conn.commit()

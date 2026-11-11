@@ -61,6 +61,7 @@ class Finding:
     severity: Severity
     detail: str
     turn: int | None = None  # index into call.turns, if it points at one turn
+    step: str | None = None  # flow step id, for flow findings (so callers never parse `detail`)
 
 
 @dataclass

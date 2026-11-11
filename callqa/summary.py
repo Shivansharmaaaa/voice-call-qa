@@ -27,9 +27,8 @@ def summarize(spec: AgentSpec, calls: list[dict]) -> dict:
     skipped: dict[str, int] = {}
     for x in calls:
         for f in x["findings"]:
-            if f["code"] == "skipped_step":
-                step = f["detail"].split("'")[1]
-                skipped[step] = skipped.get(step, 0) + 1
+            if f["code"] == "skipped_step" and f.get("step"):
+                skipped[f["step"]] = skipped.get(f["step"], 0) + 1
     keys = sorted({k for x in calls for k in x["metrics"]})
     avg = {k: round(sum(x["metrics"].get(k, 0) for x in calls) / n, 3) for k in keys} if n else {}
     hist = [0] * 10

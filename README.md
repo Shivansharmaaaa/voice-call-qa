@@ -82,10 +82,10 @@ checks:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q                               # 26 tests
+pytest -q                               # 31 tests (+1 Postgres test, see below)
 python -m callqa.evaluate               # benchmark against planted faults
-cd web && npm install && npm run build  # React app -> web/dist
-cd .. && uvicorn callqa.api:app         # API + app on http://127.0.0.1:8000 (serves web/dist)
+cd web && npm install && npm test && npm run build  # 6 frontend tests, then the React app -> web/dist
+cd .. && uvicorn --factory callqa.api:create_app  # API + app on http://127.0.0.1:8000 (serves web/dist)
 # or, for frontend work: uvicorn on :8765 and `cd web && npm run dev` (proxies /api)
 ```
 
@@ -112,6 +112,8 @@ Endpoints (interactive docs at `/api/docs`):
 | `POST /api/generate` | make a synthetic call with the faults you ask for |
 | `POST /api/calls` | score and store (self-hosted with `CALLQA_DB` only; the hosted demo returns 503) |
 | `GET /api/benchmark` | precision/recall against planted faults |
+
+Public POST endpoints are rate-limited to 60 requests a minute per client IP (429 after that), and inputs are capped (200 turns, 1,000 characters a turn, 20 KB of spec). The limiter lives in memory, so on serverless each instance counts on its own: it stops one client hammering an instance, it is not a global quota.
 
 ## How well do the checks work?
 
@@ -142,15 +144,18 @@ Two things the benchmark did teach:
 - **Language detection is a small word list.** Fine for Hindi/English; it does not handle Tamil, Telugu or other code-switched pairs yet.
 - **Question counting needs punctuation.** See above.
 - **Synthetic data only.** Not tested on real calls.
+- **Order within a turn is by text position.** If two questions share a turn, the one that appears first counts as asked first.
 
 ## Testing status
 
 Run on macOS, Python 3.14:
-- `pytest -q`: 26 tests pass (each check and exemption, spec validation, every API endpoint including edited-spec scoring and fault generation, read-only vs database mode, and a benchmark floor).
+- `pytest -q`: 31 tests pass (each check and exemption, two questions swapped inside one turn, spec validation, every API endpoint including edited-spec scoring and fault generation, rate limiting, read-only vs database mode on SQLite, nothing built at import, and a benchmark floor).
+- Database mode on **Postgres 15**: `CALLQA_TEST_PG=postgresql+psycopg://user@host:port/db pytest -q` runs one more test (store, replace, read back, check the rows in SQL). It passed against a local Postgres 15; it is skipped when the variable isn't set. Needs `pip install "psycopg[binary]"`.
+- `npm test`: 6 frontend tests pass (Vitest + Testing Library: findings pinned to the right turn, silence markers, call-level findings, planted-vs-found panel, routing helpers).
 - `npm run build`: TypeScript type-check and production build pass.
 - Clicked through by hand in a browser, locally (uvicorn) and on the Vercel deployment: overview, call explorer and filters, call detail, Playground (generate → score), benchmark; phone width (375 px) checked for sideways scrolling.
 - The live API was checked with curl: health, summary, benchmark, explorer, and a generate-then-score round trip.
-- No frontend unit tests yet.
+- The Playground's editing flow is checked by hand in the browser, not by an automated end-to-end test.
 
 ## Likely interview questions
 
