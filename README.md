@@ -1,6 +1,6 @@
 # Voice Call QA
 
-Rule-based quality checks for voice-agent call transcripts, where **each agent defines what "good" means for itself**.
+Quality checks for voice-agent call transcripts, where **each agent defines what "good" means for itself**. Rule-based checks, plus a small trained classifier that recognises screening questions even when the agent words them differently.
 
 > Independent demo built by Shivansh Sharma as a sample for Hunar.AI's domain (conversational voice agents for frontline hiring). Not affiliated with or endorsed by Hunar.AI. All calls in this repo are synthetic; the company name in them ("Kaam Connect") is made up.
 
@@ -8,8 +8,8 @@ Rule-based quality checks for voice-agent call transcripts, where **each agent d
 
 - **Overview:** each agent's dashboard, showing only the checks that agent runs.
 - **Calls:** all 120 synthetic calls, filterable by failing check. Each call opens turn by turn, with every finding pinned to the turn it's about and the planted ground truth beside it.
-- **Playground:** pick an agent, tick the faults to plant (skip a question, interrupt the agent, slip into English, go silent…), generate a call, edit any turn, optionally edit the agent's YAML spec, and score it live. Results can be saved in your browser.
-- **Benchmark:** precision and recall of every check against the planted faults.
+- **Playground:** pick an agent, tick the faults to plant (skip a question, interrupt the agent, slip into English, go silent…), optionally use paraphrased wording, generate a call, edit any turn or the agent's YAML spec, and score it live. "Compare rules vs model" scores the same call three ways. Results can be saved in your browser.
+- **Benchmark:** precision and recall of every check against the planted faults, rules vs the trained model, and a model card.
 
 (The old static snapshot is still at https://shivansharmaaaa.github.io/voice-call-qa/.)
 
@@ -37,7 +37,8 @@ The same goes for language. Hindi-English switching is correct for a Hinglish re
                  React + TypeScript app (web/)  ── fetch /api/* ──┐
                                                                    ▼
 agents/*.yaml ─► spec.py ─► engine.py ─► checks/* ─► Report ─► FastAPI (callqa/api.py)
-                                 ▲                                 │
+                                              ▲    ▲                │
+             callqa/ml.py + models/*.json ────┘    │                │   (trained step classifier)
           synth.py (calls with planted faults) ─► in-memory demo ──┤
                                                                    └─► store.py (SQLAlchemy, optional: CALLQA_DB)
 ```
@@ -67,13 +68,49 @@ checks:
 
 | Check | Finds | How |
 |---|---|---|
-| `coverage` | a required step was skipped | step = first agent turn containing one of its match phrases; "skipped" only if a *later* step was reached |
-| `order` | steps asked out of order | first-hit turn indices must follow the flow order |
+| `coverage` | a required step was skipped | a step is recognised by its match phrases, the trained model, or both (`step_matcher`, see below); "skipped" only if a *later* step was reached |
+| `order` | steps asked out of order | first (turn, position in turn) of each step must follow the flow order |
 | `early_exit` | agent ended the call before required steps | uses `ended_by`; if the caller hung up it is reported as info, not a failure |
 | `one_question` | more than N questions in one turn | counts `?`; warns when the transcript has no punctuation at all |
 | `repeats` | unexplained repeats | similarity = max(character ratio, token Jaccard), with the exemptions above |
 | `language` | turns outside the persona | Devanagari + a romanised-Hindi word list vs English tokens, after removing allowed English words |
 | `latency` | slow agent responses | gap between the caller's turn end and the agent's turn start; p50/p95 reported |
+
+## The ML part: recognising questions however they're worded
+
+Phrase rules only see a step if the agent uses the exact words in the spec. "Abhi aap kidhar stay kar rahe ho?" is a location question, but it doesn't contain `kis area`, so the rules call the step skipped. That is the biggest weakness of a rule checker, so the step detector has a trained model next to the rules.
+
+**Model.** One classifier per agent: character 2-4-gram TF-IDF (plus whole words) and multinomial logistic regression, trained with scikit-learn (`ml/train.py`). The classes are the agent's flow steps plus `other`. Character n-grams were chosen because Hinglish spells the same word many ways (*rehte / rahte / rhte*, *kitna / kitnaa*) and mixes Devanagari with Latin script; pieces of words survive that where whole-word matching doesn't.
+
+**Data.** `ml/train_utterances.yaml`: 151 hand-labelled agent sentences (85 Hinglish, 66 Hindi), augmented x3 with spelling variants, dropped letters and punctuation noise. `ml/test_paraphrases.yaml`: 52 held-out sentences written separately and phrased differently; a test checks they share no sentence with the training set.
+
+**Threshold.** A sentence only counts as a step if the model's probability clears a threshold. It is picked by 5-fold cross-validation on the training sentences (never on the test set) and stored with the model: 0.20 for the Hinglish agent, 0.25 for the Hindi one.
+
+| Agent | Training sentences | Features | 5-fold CV accuracy | Held-out accuracy |
+|---|---|---|---|---|
+| Field sales (Hinglish) | 85 (+255 augmented) | 2,522 | 82% | 28 / 28 |
+| Rider onboarding (Hindi) | 66 (+198 augmented) | 2,304 | 65% | 23 / 24 (confuses licence with vehicle once) |
+
+**Serving.** The trained model is exported to JSON (vocabulary, idf, weights, intercepts, threshold; about 300 KB per agent) and run in plain Python in `callqa/ml.py`, so the serverless function needs neither scikit-learn nor numpy. A test checks the Python inference matches scikit-learn's probabilities to 4 decimal places, and another checks neither library is loaded when serving.
+
+**Matchers.** Each spec picks `step_matcher: phrase | ml | hybrid`. Hybrid (the default for both demo agents) uses rules first and the model for anything the rules miss; a step found only by the model is shown as a "Model" finding with its probability.
+
+**Result.** Same 120 fault plans, two kinds of wording; flow checks only (skipped step, order, early hang-up):
+
+| Agent wording | Steps found by | Caught | False alarms | Missed | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|---|
+| Templates | rules | 62 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| Templates | model | 61 | 2 | 1 | 0.97 | 0.98 | 0.98 |
+| Templates | rules + model | 62 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| Paraphrased | rules | 35 | 105 | 27 | 0.25 | 0.56 | 0.35 |
+| Paraphrased | model | 59 | 14 | 3 | 0.81 | 0.95 | 0.87 |
+| Paraphrased | rules + model | 59 | 14 | 3 | 0.81 | 0.95 | 0.87 |
+
+On paraphrased calls the rules raise 105 false alarms, mostly "skipped step" for questions that were asked in other words. The model cuts that to 14. Most of what's left traces to one held-out sentence ("Licence hai aapke paas gaadi chalane ka") that the model labels as the vehicle question.
+
+**Be honest about what this shows.** Both the training and test sentences were written by hand for this demo, and the held-out set is small (52 sentences). The CV score is lower than held-out accuracy because each fold removes a fifth of an already small training set. It shows the approach works and is measured properly; it is not a production accuracy. Real labelled calls would be needed for that.
+
+**Retrain:** `python ml/train.py` (needs `requirements-dev.txt`), then `python -m callqa.evaluate`.
 
 **Score** = weighted share of enabled checks with no failing finding. A call with one skipped step loses the whole `coverage` weight; it is deliberately coarse so a score is easy to explain.
 
@@ -82,9 +119,10 @@ checks:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q                               # 31 tests (+1 Postgres test, see below)
-python -m callqa.evaluate               # benchmark against planted faults
-cd web && npm install && npm test && npm run build  # 6 frontend tests, then the React app -> web/dist
+pytest -q                               # 42 tests (+1 Postgres test, see below)
+python -m callqa.evaluate               # benchmark, including rules vs model
+python ml/train.py                      # optional: retrain the step classifiers
+cd web && npm install && npm test && npm run build  # 7 frontend tests, then the React app -> web/dist
 cd .. && uvicorn --factory callqa.api:create_app  # API + app on http://127.0.0.1:8000 (serves web/dist)
 # or, for frontend work: uvicorn on :8765 and `cd web && npm run dev` (proxies /api)
 ```
@@ -108,10 +146,10 @@ Endpoints (interactive docs at `/api/docs`):
 | `GET /api/agents/{id}/summary` | per-agent rollup: fail rate per check, metrics, score histogram, most skipped steps |
 | `GET /api/calls?agent=&check=&q=` | call explorer |
 | `GET /api/calls/{id}` | one scored call with turn-level findings and planted ground truth |
-| `POST /api/score` | score a call without storing it; optional `spec_yaml` scores it against an edited spec |
-| `POST /api/generate` | make a synthetic call with the faults you ask for |
+| `POST /api/score` | score a call without storing it; optional `spec_yaml` (edited spec) and `matcher` (`phrase`, `ml`, `hybrid`) |
+| `POST /api/generate` | make a synthetic call with the faults you ask for; `paraphrase: true` uses held-out wording |
 | `POST /api/calls` | score and store (self-hosted with `CALLQA_DB` only; the hosted demo returns 503) |
-| `GET /api/benchmark` | precision/recall against planted faults |
+| `GET /api/benchmark` | precision/recall against planted faults, rules vs model, model card |
 
 Public POST endpoints are rate-limited to 60 requests a minute per client IP (429 after that), and inputs are capped (200 turns, 1,000 characters a turn, 20 KB of spec). The limiter lives in memory, so on serverless each instance counts on its own: it stops one client hammering an instance, it is not a global quota.
 
@@ -139,7 +177,8 @@ Two things the benchmark did teach:
 
 ## Limitations (honest)
 
-- **Phrase matching is brittle.** A paraphrased question ("aap kahan se ho?") won't match `kis area`. Next step: an embedding similarity or an LLM judge for step detection, benchmarked against these rules on the same labels.
+- **The step classifier is small.** About 150 hand-written training sentences; it still confuses close steps (licence vs vehicle) and needs real labelled calls before anyone should trust its accuracy. A multilingual sentence-embedding model is the next thing to compare against it on the same labels (it was not used here because it would not fit a small serverless function).
+- **Only step detection uses ML.** Repeats, language and question counting are still rules.
 - **Text only.** No audio: interruptions, silence and latency come from transcript timestamps.
 - **Language detection is a small word list.** Fine for Hindi/English; it does not handle Tamil, Telugu or other code-switched pairs yet.
 - **Question counting needs punctuation.** See above.
@@ -149,20 +188,23 @@ Two things the benchmark did teach:
 ## Testing status
 
 Run on macOS, Python 3.14:
-- `pytest -q`: 31 tests pass (each check and exemption, two questions swapped inside one turn, spec validation, every API endpoint including edited-spec scoring and fault generation, rate limiting, read-only vs database mode on SQLite, nothing built at import, and a benchmark floor).
+- `pytest -q`: 42 tests pass (each check and exemption, two questions swapped inside one turn, spec validation, every API endpoint including edited-spec and matcher overrides and paraphrased generation, rate limiting, read-only vs database mode on SQLite, nothing built at import, benchmark floors; and for the model: parity with scikit-learn, no train/test overlap, serving without scikit-learn or numpy, fallback when no model exists, and rules + model beating rules on paraphrased calls).
 - Database mode on **Postgres 15**: `CALLQA_TEST_PG=postgresql+psycopg://user@host:port/db pytest -q` runs one more test (store, replace, read back, check the rows in SQL). It passed against a local Postgres 15; it is skipped when the variable isn't set. Needs `pip install "psycopg[binary]"`.
-- `npm test`: 6 frontend tests pass (Vitest + Testing Library: findings pinned to the right turn, silence markers, call-level findings, planted-vs-found panel, routing helpers).
+- `npm test`: 7 frontend tests pass (Vitest + Testing Library: findings pinned to the right turn, silence markers, call-level findings, planted-vs-found panel, model-match badges, routing helpers).
 - `npm run build`: TypeScript type-check and production build pass.
-- Clicked through by hand in a browser, locally (uvicorn) and on the Vercel deployment: overview, call explorer and filters, call detail, Playground (generate → score), benchmark; phone width (375 px) checked for sideways scrolling.
+- Clicked through by hand in a browser, locally (uvicorn) and on the Vercel deployment: overview, call explorer and filters, call detail, Playground (generate → score, and rules vs model comparison on a paraphrased call), benchmark; phone width (375 px) checked for sideways scrolling.
 - The live API was checked with curl: health, summary, benchmark, explorer, and a generate-then-score round trip.
 - The Playground's editing flow is checked by hand in the browser, not by an automated end-to-end test.
 
 ## Likely interview questions
 
-1. *Why rules instead of an LLM judge?* Rules are cheap, deterministic and explainable per turn, and they give a baseline. An LLM judge is the next step for paraphrases, but it needs its own evaluation against labels like these.
-2. *How do you avoid counting a restart after an interruption as a repeat?* The earlier turn is marked `interrupted`; if it is the agent's previous turn and the new turn contains most of its tokens, it's exempt.
-3. *Why does the dashboard differ per agent?* Each spec enables its own checks and weights, so a Hinglish agent never shows a language failure rate that would mean nothing for it.
-4. *What would break first on real calls?* Step matching on paraphrases and STT errors, then question counting on unpunctuated output.
-5. *Why does the hosted demo keep data in memory?* Serverless functions have no lasting disk. Scoring is pure and fast, so the demo regenerates its 120 calls at start-up and the Playground is stateless; persistence is a config switch (`CALLQA_DB`) for self-hosting.
-6. *How would you scale this to a million calls a day?* The checks are pure functions over a transcript, so run them in a queue consumer (one call per message), write findings in batches, and pre-aggregate the per-agent rollups instead of computing them on read.
-7. *Why is the score so coarse?* A per-check pass/fail with weights is easy to explain to an ops team. Per-finding penalties are possible but harder to reason about.
+1. *Why rules first, and then a model?* Rules are cheap, deterministic and explainable per turn, and they give a baseline to measure against. The benchmark showed exactly where they break (paraphrased questions), and a small model fixed that measurably: F1 0.35 to 0.87 on paraphrased calls.
+2. *Why character n-grams and logistic regression instead of embeddings or an LLM?* Hinglish spelling varies a lot, character n-grams handle that, and the model is tiny, fast and explainable. A multilingual embedding model would be the next comparison, but it would not fit a small serverless function.
+3. *How did you choose the threshold without cheating?* Out-of-fold probabilities from 5-fold cross-validation on the training sentences only. The held-out paraphrases were never used to tune anything.
+4. *How do you know the deployed model is the trained model?* It is exported to JSON and run in plain Python; a test compares its probabilities with scikit-learn's to 4 decimal places.
+5. *How do you avoid counting a restart after an interruption as a repeat?* The earlier turn is marked `interrupted`; if it is the agent's previous turn and the new turn contains most of its tokens, it's exempt.
+6. *Why does the dashboard differ per agent?* Each spec enables its own checks and weights, so a Hinglish agent never shows a language failure rate that would mean nothing for it.
+7. *What would break first on real calls?* Step detection on wording far from the training sentences and on STT errors, then question counting on unpunctuated output. Real labelled calls would show which, and would retrain the model.
+8. *Why does the hosted demo keep data in memory?* Serverless functions have no lasting disk. Scoring is pure and fast, so the demo regenerates its 120 calls at start-up and the Playground is stateless; persistence is a config switch (`CALLQA_DB`) for self-hosting.
+9. *How would you scale this to a million calls a day?* The checks are pure functions over a transcript, so run them in a queue consumer (one call per message), write findings in batches, and pre-aggregate the per-agent rollups instead of computing them on read.
+10. *Why is the score so coarse?* A per-check pass/fail with weights is easy to explain to an ops team. Per-finding penalties are possible but harder to reason about.

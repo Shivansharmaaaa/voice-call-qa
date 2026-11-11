@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Agent, api, CallInput, EndedBy, Fault, Matcher, MATCHER_LABEL, ScoredCall, Turn } from "../api";
+import { Agent, api, CallInput, CHECK_LABEL, EndedBy, Fault, Matcher, MATCHER_LABEL, ScoredCall, Turn } from "../api";
 import { CallView } from "../components/CallView";
 import { href } from "../router";
 
@@ -265,13 +265,13 @@ export function Playground({ params }: { params: URLSearchParams }) {
           <div className="compare">
             {(["phrase", "ml", "hybrid"] as Matcher[]).map((m) => {
               const r = compare[m];
-              const skipped = r.findings.filter((f) => f.code === "skipped_step").map((f) => f.step).filter(Boolean);
+              const failing = r.failed_checks.map((c) => CHECK_LABEL[c] ?? c);
               const byModel = r.findings.filter((f) => f.code === "ml_step_match").length;
               return (
                 <button key={m} className="compare-col" onClick={() => setResult(truth && !dirty ? { ...r, labels: truth.labels, planted: truth.planted } : r)}>
                   <span className="muted small">{MATCHER_LABEL[m]}</span>
                   <span className={`score tone-${r.score >= 85 ? "good" : r.score >= 65 ? "mid" : "bad"}`}>{r.score}</span>
-                  <span className="small">{skipped.length ? `flags skipped: ${skipped.join(", ")}` : "no skipped steps"}</span>
+                  <span className="small">{failing.length ? `fails: ${failing.join(", ")}` : "passes every check"}</span>
                   {byModel > 0 && <span className="small muted">{byModel} step{byModel > 1 ? "s" : ""} found by the model</span>}
                   <span className="small linklike">view details</span>
                 </button>
