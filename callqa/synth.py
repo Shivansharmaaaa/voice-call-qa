@@ -103,7 +103,17 @@ def _turns_from_lines(lines: list[tuple[str, str, bool]], rng: random.Random, sl
     return turns
 
 
-def make_call(agent_id: str, n: int, rng: random.Random) -> Sample:
+FAULTS = ["skip", "swap", "early_exit", "user_hangup", "double", "repeat", "restart", "asked_repeat",
+          "english", "compliance_repeat", "slow", "no_punctuation"]
+
+
+def make_call(agent_id: str, n: int, rng: random.Random, faults: set[str] | None = None,
+              call_id: str | None = None) -> Sample:
+    """Random faults by default; pass `faults` to plant exactly those (where the call allows it)."""
+
+    def want(name: str, p: float) -> bool:
+        return rng.random() < p if faults is None else name in faults
+
     sc = SCRIPTS[agent_id]
     steps = [(sid, rng.choice(a), rng.choice(u)) for sid, a, u in sc["steps"]]
     labels: list[str] = []
@@ -112,7 +122,10 @@ def make_call(agent_id: str, n: int, rng: random.Random) -> Sample:
     middle = list(range(2, len(steps) - 1))  # never touch greet, consent or close
 
     # 1. One structural change at most.
-    structural = rng.choices(["none", "skip", "swap", "early_exit", "user_hangup"], [0.4, 0.15, 0.15, 0.15, 0.15])[0]
+    if faults is None:
+        structural = rng.choices(["none", "skip", "swap", "early_exit", "user_hangup"], [0.4, 0.15, 0.15, 0.15, 0.15])[0]
+    else:
+        structural = next((f for f in ("skip", "swap", "early_exit", "user_hangup") if f in faults), "none")
     if structural == "skip":
         i = rng.choice(middle[:-1])
         if sc["steps"][i][0] != "app_link":
@@ -140,16 +153,28 @@ def make_call(agent_id: str, n: int, rng: random.Random) -> Sample:
     plan: dict[int, str] = {}
     for kind, p in [("double", 0.2), ("repeat", 0.2), ("restart", 0.2), ("asked_repeat", 0.2),
                     ("english", 0.25 if sc["english"] else 0.0)]:
-        if free and rng.random() < p:
-            i = free.pop()
+        if not free or not want(kind, p):
+            continue
+
+        def ok(i: int) -> bool:
             if kind == "double" and (i + 1 >= len(steps) or steps[i + 1][0] == "close" or (i + 1) in plan
                                      or "?" not in steps[i][1] or "?" not in steps[i + 1][1]):
+                return False
+            return not (kind == "english" and steps[i][0] not in sc["english"])
+
+        if faults is None:
+            i = free.pop()
+            if not ok(i):
                 continue
-            if kind == "english" and steps[i][0] not in sc["english"]:
+        else:  # asked for this fault explicitly: find a step where it fits
+            fits = [i for i in free if ok(i)]
+            if not fits:
                 continue
-            plan[i] = kind
-            if kind == "double" and (i + 1) in free:
-                free.remove(i + 1)
+            i = fits[-1]
+            free.remove(i)
+        plan[i] = kind
+        if kind == "double" and (i + 1) in free:
+            free.remove(i + 1)
 
     skip_next = False
     for i, (sid, a, u) in enumerate(steps):
@@ -187,14 +212,14 @@ def make_call(agent_id: str, n: int, rng: random.Random) -> Sample:
                 lines += [("user", u, False)]
 
     # 3. Repeated compliance line later in the call (must not flag).
-    if len(lines) > 8 and rng.random() < 0.15:
+    if len(lines) > 8 and want("compliance_repeat", 0.15):
         pos = len(lines) - 1 if lines[-1][0] == "agent" else len(lines)  # just before the closing line
         lines[pos:pos] = [("agent", sc["consent_text"], False), ("user", sc["steps"][1][2][0], False)]
         planted.append("compliance_repeat (must not flag)")
 
     # 4. One slow agent response.
     slow_at = None
-    if rng.random() < 0.2:
+    if want("slow", 0.2):
         options = [i for i in range(1, len(lines)) if lines[i][0] == "agent" and lines[i - 1][0] == "user"]
         if options:
             slow_at = rng.choice(options)
@@ -204,12 +229,12 @@ def make_call(agent_id: str, n: int, rng: random.Random) -> Sample:
     turns = _turns_from_lines(lines, rng, slow_at)
 
     # 5. STT noise: some transcripts arrive with no punctuation at all.
-    if rng.random() < 0.12:
+    if want("no_punctuation", 0.12):
         for t in turns:
             t.text = re.sub(r"[?？.,!।]", "", t.text)
         planted.append("no_punctuation")
 
-    return Sample(Call(id=f"{agent_id}-{n:03d}", agent_id=agent_id, turns=turns, ended_by=ended_by),
+    return Sample(Call(id=call_id or f"{agent_id}-{n:03d}", agent_id=agent_id, turns=turns, ended_by=ended_by),
                   sorted(set(labels)), planted)
 
 

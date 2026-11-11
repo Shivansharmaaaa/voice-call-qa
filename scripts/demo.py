@@ -1,33 +1,26 @@
-"""Load the synthetic calls through the API into a fresh database and write a static dashboard.
+"""Write the synthetic calls to data/ and a static HTML snapshot of the dashboard to docs/.
 
-Run: python scripts/demo.py   -> data/synthetic_calls.jsonl, docs/index.html
+Run: python scripts/demo.py
 """
 from __future__ import annotations
 
 import sys
-from dataclasses import asdict
 from pathlib import Path
-
-from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from callqa.api import create_app, render_dashboard  # noqa: E402
-from callqa.synth import generate, save  # noqa: E402
+from callqa.api import Demo, render_dashboard  # noqa: E402
+from callqa.summary import summarize  # noqa: E402
+from callqa.synth import save  # noqa: E402
 
 
 def main() -> None:
-    db = ROOT / "data" / "demo.db"
-    db.parent.mkdir(exist_ok=True)
-    db.unlink(missing_ok=True)
-    samples = generate()
-    save(samples, ROOT / "data" / "synthetic_calls.jsonl")
-    client = TestClient(create_app(f"sqlite:///{db}"))
-    for s in samples:
-        r = client.post("/calls", json=asdict(s.call))
-        r.raise_for_status()
-    summaries = [client.get(f"/agents/{a['id']}/summary").json() for a in client.get("/agents").json()]
+    demo = Demo(ROOT / "agents")
+    (ROOT / "data").mkdir(exist_ok=True)
+    save(demo.samples, ROOT / "data" / "synthetic_calls.jsonl")
+    summaries = [summarize(spec, [c for c in demo.calls.values() if c["agent_id"] == spec.id])
+                 for spec in demo.specs.values()]
     (ROOT / "docs").mkdir(exist_ok=True)
     (ROOT / "docs" / "index.html").write_text(render_dashboard(summaries), encoding="utf-8")
     for s in summaries:
