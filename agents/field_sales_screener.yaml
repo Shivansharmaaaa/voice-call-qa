@@ -3,6 +3,7 @@
 id: field-sales-screener
 name: Field sales screener (Hinglish)
 persona: mixed
+step_matcher: hybrid  # phrase rules first, trained model for paraphrases (see ml/)
 flow:
   - id: greet
     match: ["namaste"]

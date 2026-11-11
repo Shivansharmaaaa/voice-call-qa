@@ -151,6 +151,7 @@ table.calls tbody tr:hover { background: var(--bg); }
 .sev-fail { background: var(--bad-soft); color: #8e2a1f; }
 .sev-warn { background: var(--warn-soft); color: #7a5312; }
 .sev-info { background: var(--info-soft); color: #3c4a5e; }
+.sev-model { background: #ece8fb; color: #4b3a8f; }
 .brow { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .dot-ok { background: var(--good); }
@@ -166,6 +167,10 @@ table.calls tbody tr:hover { background: var(--bg); }
 .fault-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; margin: 12px 0; }
 .fault { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: #fff; }
 .fault-on { border-color: var(--brand); background: var(--brand-soft); }
+.fault-wide { margin: 10px 0; }
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+.compare-col { display: grid; gap: 6px; justify-items: start; text-align: left; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; cursor: pointer; }
+.compare-col:hover { border-color: var(--brand); }
 .fault input { margin-top: 4px; }
 .editor { display: grid; gap: 8px; max-height: 560px; overflow-y: auto; padding-right: 4px; }
 .erow { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--agent); }

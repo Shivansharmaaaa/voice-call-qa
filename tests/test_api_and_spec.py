@@ -149,3 +149,20 @@ def test_database_mode_on_postgres():
         conn.execute(text("delete from findings where call_id = 'pg-test-1'"))
         conn.execute(text("delete from calls where id = 'pg-test-1'"))
         conn.commit()
+
+
+def test_score_with_matcher_override_and_paraphrased_generation(client):
+    g = client.post("/api/generate", json={"agent_id": "field-sales-screener", "faults": [], "seed": 3,
+                                           "paraphrase": True}).json()
+    rules = client.post("/api/score", json={"call": g["call"], "matcher": "phrase"}).json()
+    hybrid = client.post("/api/score", json={"call": g["call"], "matcher": "hybrid"}).json()
+    assert rules["matcher"] == "phrase" and hybrid["matcher"] == "hybrid"
+    assert hybrid["score"] > rules["score"]  # clean call: rules miss paraphrased steps, the model doesn't
+    assert client.post("/api/score", json={"call": g["call"], "matcher": "magic"}).status_code == 422
+
+
+def test_benchmark_includes_matcher_comparison_and_model_card(client):
+    b = client.get("/api/benchmark").json()
+    assert b["matchers"]["paraphrased"]["hybrid"]["flow_f1"] > b["matchers"]["paraphrased"]["phrase"]["flow_f1"]
+    assert b["models"]["field-sales-screener"]["algorithm"].startswith("char")
+    assert client.get("/api/agents").json()[0]["step_matcher"] == "hybrid"

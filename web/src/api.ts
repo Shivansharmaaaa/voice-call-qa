@@ -34,6 +34,29 @@ export interface ScoredCall extends CallInput {
   labels?: string[];
   planted?: string[];
   source: "synthetic" | "playground" | "stored";
+  matcher?: Matcher;
+}
+
+export type Matcher = "phrase" | "ml" | "hybrid";
+
+export interface ModelCard {
+  algorithm: string;
+  trained_sentences: number;
+  augmented_rows: number;
+  features: number;
+  cv_accuracy: number;
+  heldout_accuracy: number;
+  heldout_sentences: number;
+  threshold: number;
+}
+
+export interface MatcherRow {
+  flow_tp: number;
+  flow_fp: number;
+  flow_fn: number;
+  flow_precision: number;
+  flow_recall: number;
+  flow_f1: number;
 }
 
 export interface CheckCfg {
@@ -53,6 +76,8 @@ export interface Agent {
   allowed_english: string[];
   checks: CheckCfg[];
   faults: string[];
+  step_matcher: Matcher;
+  model: ModelCard | null;
 }
 
 export interface Summary {
@@ -99,6 +124,8 @@ export interface Benchmark {
   calls: number;
   per_finding: Record<string, { tp: number; fp: number; fn: number; precision: number; recall: number }>;
   must_not_flag: Record<string, { planted: number; wrongly_flagged: number }>;
+  matchers: Record<"template" | "paraphrased", Record<Matcher, MatcherRow>>;
+  models: Record<string, ModelCard>;
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -123,10 +150,13 @@ export const api = {
   calls: (params: Record<string, string>) =>
     req<CallRow[]>(`/api/calls?${new URLSearchParams(Object.entries(params).filter(([, v]) => v))}`),
   call: (id: string) => req<ScoredCall>(`/api/calls/${encodeURIComponent(id)}`),
-  score: (call: CallInput, spec_yaml?: string) =>
-    req<ScoredCall>("/api/score", { method: "POST", body: JSON.stringify({ call, spec_yaml: spec_yaml || null }) }),
-  generate: (agent_id: string, faults: string[], seed?: number) =>
-    req<Generated>("/api/generate", { method: "POST", body: JSON.stringify({ agent_id, faults, seed }) }),
+  score: (call: CallInput, spec_yaml?: string, matcher?: Matcher) =>
+    req<ScoredCall>("/api/score", {
+      method: "POST",
+      body: JSON.stringify({ call, spec_yaml: spec_yaml || null, matcher: matcher || null }),
+    }),
+  generate: (agent_id: string, faults: string[], paraphrase = false, seed?: number) =>
+    req<Generated>("/api/generate", { method: "POST", body: JSON.stringify({ agent_id, faults, seed, paraphrase }) }),
   benchmark: () => req<Benchmark>("/api/benchmark"),
 };
 
@@ -138,6 +168,12 @@ export const CHECK_LABEL: Record<string, string> = {
   repeats: "No unexplained repeats",
   language: "Stays in persona",
   latency: "Responds quickly",
+};
+
+export const MATCHER_LABEL: Record<Matcher, string> = {
+  phrase: "Rules only",
+  ml: "Model only",
+  hybrid: "Rules + model",
 };
 
 export function scoreTone(score: number): "good" | "mid" | "bad" {

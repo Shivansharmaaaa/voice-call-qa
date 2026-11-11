@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Agent, api, CallInput, EndedBy, Fault, ScoredCall, Turn } from "../api";
+import { Agent, api, CallInput, EndedBy, Fault, Matcher, MATCHER_LABEL, ScoredCall, Turn } from "../api";
 import { CallView } from "../components/CallView";
 import { href } from "../router";
 
@@ -40,6 +40,9 @@ export function Playground({ params }: { params: URLSearchParams }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<Saved[]>(loadSaved);
+  const [paraphrase, setParaphrase] = useState(true);
+  const [matcher, setMatcher] = useState<Matcher | "">("");
+  const [compare, setCompare] = useState<Record<Matcher, ScoredCall> | null>(null);
 
   const agent = useMemo(() => agents.find((a) => a.id === agentId), [agents, agentId]);
 
@@ -72,11 +75,29 @@ export function Playground({ params }: { params: URLSearchParams }) {
     setBusy(true);
     setErr("");
     try {
-      const g = await api.generate(agentId, picked.filter((f) => agent?.faults.includes(f)));
+      const g = await api.generate(agentId, picked.filter((f) => agent?.faults.includes(f)), paraphrase);
       setDraft(g.call);
       setTruth({ labels: g.labels, planted: g.planted, notPlanted: g.not_planted });
       setDirty(false);
       setResult(null);
+      setCompare(null);
+    } catch (e) {
+      setErr(String((e as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function compareMatchers() {
+    if (!draft) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const spec = editSpec ? specYaml : undefined;
+      const [phrase, ml, hybrid] = await Promise.all(
+        (["phrase", "ml", "hybrid"] as Matcher[]).map((m) => api.score(draft, spec, m)),
+      );
+      setCompare({ phrase, ml, hybrid });
     } catch (e) {
       setErr(String((e as Error).message));
     } finally {
@@ -89,7 +110,7 @@ export function Playground({ params }: { params: URLSearchParams }) {
     setBusy(true);
     setErr("");
     try {
-      const r = await api.score(draft, editSpec ? specYaml : undefined);
+      const r = await api.score(draft, editSpec ? specYaml : undefined, matcher || undefined);
       const withTruth = truth && !dirty ? { ...r, labels: truth.labels, planted: truth.planted } : r;
       setResult(withTruth);
       requestAnimationFrame(() => document.getElementById("result")?.scrollIntoView({ behavior: "smooth" }));
@@ -150,6 +171,14 @@ export function Playground({ params }: { params: URLSearchParams }) {
           ))}
         </div>
         <p className="muted small">Structural faults (skip, swap, hang-ups) are exclusive: the first one ticked is used.</p>
+        <label className="fault fault-wide">
+          <input type="checkbox" checked={paraphrase} onChange={(e) => setParaphrase(e.target.checked)} />
+          <span>
+            <b>Use paraphrased agent wording</b>
+            <span className="muted small block">Agent lines come from a held-out set the model never trained on and the rule phrases don't
+              cover, e.g. "Abhi aap kidhar stay kar rahe ho?" instead of "Aap kis area mein rehte hain?". This is where rules break.</span>
+          </span>
+        </label>
         <button className="btn btn-primary" onClick={generate} disabled={busy || !agentId}>Generate a call</button>
       </div>
 
@@ -209,9 +238,49 @@ export function Playground({ params }: { params: URLSearchParams }) {
               <button className="btn" onClick={() => agent && setSpecYaml(agent.yaml)}>Reset spec</button>
             </>
           )}
+          <h3>4. How should steps be recognised?</h3>
+          <div className="row-wrap">
+            <button className={`seg ${matcher === "" ? "seg-on" : ""}`} onClick={() => setMatcher("")}>
+              Agent default ({agent ? MATCHER_LABEL[agent.step_matcher] : "…"})
+            </button>
+            {(["phrase", "ml", "hybrid"] as Matcher[]).map((m) => (
+              <button key={m} className={`seg ${matcher === m ? "seg-on" : ""}`} onClick={() => setMatcher(m)}>{MATCHER_LABEL[m]}</button>
+            ))}
+          </div>
+          <p className="muted small">
+            Rules look for exact phrases. The model is a character n-gram classifier trained on labelled agent sentences
+            {agent?.model && <> ({agent.model.trained_sentences} sentences, {agent.model.features.toLocaleString()} features)</>}; it handles
+            paraphrases and Hinglish spelling.
+          </p>
           <div className="row-wrap sticky-actions">
             <button className="btn btn-primary" onClick={score} disabled={busy}>{busy ? "Scoring…" : "Score this call"}</button>
+            <button className="btn" onClick={compareMatchers} disabled={busy}>Compare rules vs model</button>
           </div>
+        </div>
+      )}
+
+      {compare && (
+        <div className="card">
+          <h3>Same call, three ways of recognising steps</h3>
+          <div className="compare">
+            {(["phrase", "ml", "hybrid"] as Matcher[]).map((m) => {
+              const r = compare[m];
+              const skipped = r.findings.filter((f) => f.code === "skipped_step").map((f) => f.step).filter(Boolean);
+              const byModel = r.findings.filter((f) => f.code === "ml_step_match").length;
+              return (
+                <button key={m} className="compare-col" onClick={() => setResult(truth && !dirty ? { ...r, labels: truth.labels, planted: truth.planted } : r)}>
+                  <span className="muted small">{MATCHER_LABEL[m]}</span>
+                  <span className={`score tone-${r.score >= 85 ? "good" : r.score >= 65 ? "mid" : "bad"}`}>{r.score}</span>
+                  <span className="small">{skipped.length ? `flags skipped: ${skipped.join(", ")}` : "no skipped steps"}</span>
+                  {byModel > 0 && <span className="small muted">{byModel} step{byModel > 1 ? "s" : ""} found by the model</span>}
+                  <span className="small linklike">view details</span>
+                </button>
+              );
+            })}
+          </div>
+          {truth && !dirty && (
+            <p className="small muted">Planted: {truth.planted.join(", ") || "nothing (a clean call)"}. Expected failures: {truth.labels.join(", ") || "none"}.</p>
+          )}
         </div>
       )}
 

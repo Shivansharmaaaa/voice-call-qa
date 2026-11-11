@@ -1,11 +1,20 @@
 """Call-flow checks: did the agent cover every required step, in order, and not hang up early?
 
-A step counts as covered at the first place an agent turn contains one of its match
-phrases. "Place" is (turn index, character position in that turn), so two steps asked
-in the same turn still have an order.
+A step counts as covered at the first place an agent turn asks it. "Place" is
+(turn index, character position in that turn), so two steps asked in the same turn
+still have an order.
+
+How a step is recognised depends on the spec's step_matcher:
+  - phrase: the turn contains one of the step's match phrases (exact, after normalising).
+  - ml:     the trained classifier (callqa/ml.py) labels a sentence of the turn as that
+            step with probability >= ml_threshold.
+  - hybrid: either; whichever comes first in the call wins.
 """
 from __future__ import annotations
 
+from functools import lru_cache
+
+from ..ml import clauses, load_model
 from ..models import AgentSpec, Call, Finding
 from ..text import normalize
 
@@ -19,18 +28,45 @@ def _position(text: str, phrases: list[str]) -> int | None:
     return min(found) if found else None
 
 
-def first_hits(call: Call, spec: AgentSpec) -> dict[str, Hit]:
+@lru_cache(maxsize=4096)
+def _predict(agent_id: str, sentence: str) -> tuple[str, float]:
+    model = load_model(agent_id)
+    return model.predict(sentence) if model else ("other", 0.0)
+
+
+def step_hits(call: Call, spec: AgentSpec) -> tuple[dict[str, Hit], dict[str, tuple[str, float]], str]:
+    """Returns (first hit per step, how each was recognised, the matcher actually used)."""
+    mode = spec.step_matcher
+    if mode != "phrase" and load_model(spec.id) is None:
+        mode = "phrase"  # no trained model for this agent: fall back to rules
+    step_ids = {s.id for s in spec.flow}
+    model = load_model(spec.id)
+    threshold = spec.ml_threshold if spec.ml_threshold is not None else (model.meta.get("threshold", 0.4) if model else 1.0)
     hits: dict[str, Hit] = {}
+    source: dict[str, tuple[str, float]] = {}
     for i, turn in enumerate(call.turns):
         if turn.speaker != "agent":
             continue
-        for step in spec.flow:
-            if step.id in hits:
-                continue
-            pos = _position(turn.text, step.match)
-            if pos is not None:
-                hits[step.id] = (i, pos)
-    return hits
+        found: list[tuple[int, int, str, str, float]] = []  # (pos, phrase-first tiebreak, step, how, p)
+        if mode in ("phrase", "hybrid"):
+            for step in spec.flow:
+                pos = _position(turn.text, step.match)
+                if pos is not None:
+                    found.append((pos, 0, step.id, "phrase", 1.0))
+        if mode in ("ml", "hybrid"):
+            for offset, sentence in clauses(turn.text):
+                label, p = _predict(spec.id, sentence)
+                if label in step_ids and p >= threshold:
+                    found.append((offset, 1, label, "ml", p))
+        for pos, _, step_id, how, p in sorted(found):
+            if step_id not in hits:
+                hits[step_id] = (i, pos)
+                source[step_id] = (how, p)
+    return hits, source, mode
+
+
+def first_hits(call: Call, spec: AgentSpec) -> dict[str, Hit]:
+    return step_hits(call, spec)[0]
 
 
 def _missing(spec: AgentSpec, hits: dict[str, Hit]) -> tuple[list[str], list[str]]:
@@ -45,13 +81,22 @@ def _missing(spec: AgentSpec, hits: dict[str, Hit]) -> tuple[list[str], list[str
 
 
 def check_coverage(call: Call, spec: AgentSpec, params: dict) -> tuple[list[Finding], dict]:
-    hits = first_hits(call, spec)
+    hits, source, mode = step_hits(call, spec)
     skipped, _ = _missing(spec, hits)
     findings = [Finding("coverage", "skipped_step", "fail", f"required step '{s}' was skipped", step=s)
                 for s in skipped]
+    for step_id, (how, p) in source.items():
+        if how == "ml":
+            findings.append(Finding("coverage", "ml_step_match", "info",
+                                    f"step '{step_id}' recognised by the trained model (p={p:.2f}); no rule phrase matched",
+                                    turn=hits[step_id][0], step=step_id))
+    if spec.step_matcher != "phrase" and mode == "phrase":
+        findings.append(Finding("coverage", "ml_unavailable", "warn",
+                                "no trained model for this agent; used phrase rules instead"))
     required = [s for s in spec.flow if s.required]
     covered = sum(1 for s in required if s.id in hits)
-    return findings, {"step_coverage": covered / len(required) if required else 1.0}
+    return findings, {"step_coverage": covered / len(required) if required else 1.0,
+                      "steps_found_by_model": float(sum(1 for how, _ in source.values() if how == "ml"))}
 
 
 def check_order(call: Call, spec: AgentSpec, params: dict) -> tuple[list[Finding], dict]:

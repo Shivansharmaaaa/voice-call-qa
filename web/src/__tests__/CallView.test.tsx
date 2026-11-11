@@ -59,3 +59,18 @@ describe("CallView", () => {
     expect(screen.getByRole("img", { name: "score 72.7 of 100" })).toBeTruthy();
   });
 });
+
+describe("model matches", () => {
+  it("labels steps found by the trained model and names the matcher", () => {
+    const withModel: ScoredCall = {
+      ...call,
+      matcher: "hybrid",
+      findings: [{ check: "coverage", code: "ml_step_match", severity: "info", turn: 0, step: "location",
+        detail: "step 'location' recognised by the trained model (p=0.62); no rule phrase matched" }],
+    };
+    render(<CallView call={withModel} />);
+    const turn = screen.getByText("Aapka notice period kitna hai?").closest(".turn") as HTMLElement;
+    expect(within(turn).getByText("Model")).toBeTruthy();
+    expect(screen.getByText("Rules + model")).toBeTruthy();
+  });
+});

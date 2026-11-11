@@ -15,7 +15,7 @@ import os
 import random
 import time
 from collections import defaultdict, deque
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from functools import cached_property
 from pathlib import Path
 
@@ -26,7 +26,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .engine import score_call
-from .evaluate import evaluate
+from .evaluate import compare_matchers, evaluate
+from .ml import load_model
 from .models import AgentSpec, Call, Turn
 from .spec import SpecError, load_spec_text
 from .store import Store
@@ -69,12 +70,14 @@ class CallIn(BaseModel):
 class ScoreIn(BaseModel):
     call: CallIn
     spec_yaml: str | None = Field(default=None, max_length=20_000)  # optional edited spec to score against
+    matcher: str | None = Field(default=None, pattern="^(phrase|ml|hybrid)$")  # override how steps are recognised
 
 
 class GenerateIn(BaseModel):
     agent_id: str
     faults: list[str] = []
     seed: int | None = None
+    paraphrase: bool = False  # use held-out paraphrased agent lines
 
 
 class RateLimiter:
@@ -124,7 +127,11 @@ class Demo:
 
     @cached_property
     def benchmark(self) -> dict:
-        return evaluate(self.samples, self.specs)
+        return {**evaluate(self.samples, self.specs), "matchers": compare_matchers(self.specs), "models": self.models}
+
+    @property
+    def models(self) -> dict:
+        return {a: m.meta for a in self.specs if (m := load_model(a))}
 
 
 def _to_call(body: CallIn) -> Call:
@@ -164,6 +171,7 @@ def create_app(db_url: str | None = None, agents_dir: Path = ROOT / "agents",
     @app.get("/api/agents")
     def agents():
         return [{"id": s.id, "name": s.name, "persona": s.persona, "yaml": demo.yaml[s.id],
+                 "step_matcher": s.step_matcher, "model": demo.models.get(s.id),
                  "flow": [asdict(f) for f in s.flow], "compliance_lines": s.compliance_lines,
                  "allowed_english": s.allowed_english,
                  "checks": [{"name": n, "weight": c.weight, "params": c.params, "enabled": c.enabled}
@@ -218,8 +226,10 @@ def create_app(db_url: str | None = None, agents_dir: Path = ROOT / "agents",
             spec = demo.specs.get(body.call.agent_id)
             if not spec:
                 raise HTTPException(404, f"unknown agent '{body.call.agent_id}'")
+        if body.matcher:
+            spec = replace(spec, step_matcher=body.matcher)
         call = _to_call(body.call)
-        return report_dict(call, spec, score_call(call, spec), {"source": "playground"})
+        return report_dict(call, spec, score_call(call, spec), {"source": "playground", "matcher": spec.step_matcher})
 
     @app.post("/api/calls")
     def post_call(body: CallIn):
@@ -243,7 +253,8 @@ def create_app(db_url: str | None = None, agents_dir: Path = ROOT / "agents",
         if bad:
             raise HTTPException(422, f"unknown faults: {bad}")
         seed = body.seed if body.seed is not None else random.randrange(1_000_000)
-        s = make_call(body.agent_id, 0, random.Random(seed), set(body.faults), call_id=f"generated-{seed}")
+        s = make_call(body.agent_id, 0, random.Random(seed), set(body.faults), call_id=f"generated-{seed}",
+                      paraphrase=body.paraphrase)
         asked = set(body.faults)
         planted_kinds = {p.split(":")[0].split(" ")[0] for p in s.planted}
         alias = {"restart_after_interrupt": "restart", "caller_asked_repeat": "asked_repeat",

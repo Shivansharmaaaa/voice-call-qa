@@ -49,6 +49,8 @@ class AgentSpec:
     compliance_lines: list[str] = field(default_factory=list)
     allowed_english: list[str] = field(default_factory=list)  # loanwords fine in a Hindi persona
     checks: dict[str, CheckConfig] = field(default_factory=dict)
+    step_matcher: Literal["phrase", "ml", "hybrid"] = "phrase"  # how flow steps are recognised
+    ml_threshold: float | None = None  # minimum model probability; None = the threshold chosen at training
 
     def check(self, name: str) -> CheckConfig:
         return self.checks.get(name, CheckConfig(enabled=False, weight=0))

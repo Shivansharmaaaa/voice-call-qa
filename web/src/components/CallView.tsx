@@ -1,11 +1,11 @@
-import { CHECK_LABEL, Finding, ScoredCall, scoreTone } from "../api";
+import { CHECK_LABEL, Finding, MATCHER_LABEL, ScoredCall, scoreTone } from "../api";
 
 const SEV_LABEL = { fail: "Fail", warn: "Warning", info: "Not counted" } as const;
 
 function Badge({ f }: { f: Finding }) {
   return (
-    <div className={`finding sev-${f.severity}`}>
-      <span className="finding-tag">{SEV_LABEL[f.severity]}</span>
+    <div className={`finding sev-${f.code === "ml_step_match" ? "model" : f.severity}`}>
+      <span className="finding-tag">{f.code === "ml_step_match" ? "Model" : SEV_LABEL[f.severity]}</span>
       <span>
         <b>{CHECK_LABEL[f.check] ?? f.check}</b> · {f.detail}
       </span>
@@ -46,7 +46,10 @@ export function CallView({ call }: { call: ScoredCall }) {
       <div className="card call-head">
         <ScoreRing score={call.score} />
         <div className="call-head-text">
-          <div className="muted small">{call.agent_id} · ended by {call.ended_by === "user" ? "the caller" : call.ended_by}</div>
+          <div className="muted small">
+            {call.agent_id} · ended by {call.ended_by === "user" ? "the caller" : call.ended_by}
+            {call.matcher && <> · steps found by <b>{MATCHER_LABEL[call.matcher]}</b></>}
+          </div>
           <h2 className="mono">{call.id}</h2>
           <div className="muted">
             {call.turns.length} turns · {fails === 0 ? "no failures" : `${fails} failing finding${fails > 1 ? "s" : ""}`}

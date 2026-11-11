@@ -14,6 +14,7 @@ from .models import AgentSpec, CheckConfig, FlowStep
 
 KNOWN_CHECKS = {"coverage", "order", "early_exit", "one_question", "repeats", "language", "latency"}
 PERSONAS = {"mixed", "hindi_only", "english_only"}
+MATCHERS = {"phrase", "ml", "hybrid"}
 
 
 class SpecError(ValueError):
@@ -43,8 +44,17 @@ def parse_spec(data: dict) -> AgentSpec:
         cfg = dict(cfg or {})
         checks[name] = CheckConfig(enabled=cfg.pop("enabled", True), weight=float(cfg.pop("weight", 1.0)),
                                    params=cfg)
+    matcher = data.get("step_matcher", "phrase")
+    if matcher not in MATCHERS:
+        raise SpecError(f"step_matcher must be one of {sorted(MATCHERS)}")
+    threshold = data.get("ml_threshold")
+    if threshold is not None:
+        threshold = float(threshold)
+        if not 0 < threshold < 1:
+            raise SpecError("ml_threshold must be between 0 and 1")
     return AgentSpec(
         id=data["id"], name=data["name"], persona=data["persona"], flow=flow,
+        step_matcher=matcher, ml_threshold=threshold,
         compliance_lines=[c.lower() for c in data.get("compliance_lines", [])],
         allowed_english=[w.lower() for w in data.get("allowed_english", [])],
         checks=checks,

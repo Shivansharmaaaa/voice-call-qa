@@ -21,6 +21,14 @@ from pathlib import Path
 
 from .models import Call, Turn
 
+PARAPHRASES_FILE = Path(__file__).resolve().parent.parent / "ml" / "test_paraphrases.yaml"
+
+
+def _paraphrases() -> dict:
+    """Held-out agent lines (never used to train the model or write the rules), for the paraphrase benchmark."""
+    import yaml
+    return yaml.safe_load(PARAPHRASES_FILE.read_text(encoding="utf-8"))
+
 SCRIPTS = {
     "field-sales-screener": {
         "consent_text": "Yeh call quality ke liye record ho rahi hai, theek hai?",
@@ -108,14 +116,21 @@ FAULTS = ["skip", "swap", "early_exit", "user_hangup", "double", "repeat", "rest
 
 
 def make_call(agent_id: str, n: int, rng: random.Random, faults: set[str] | None = None,
-              call_id: str | None = None) -> Sample:
-    """Random faults by default; pass `faults` to plant exactly those (where the call allows it)."""
+              call_id: str | None = None, paraphrase: bool = False) -> Sample:
+    """Random faults by default; pass `faults` to plant exactly those (where the call allows it).
+
+    paraphrase=True swaps each agent line for a held-out paraphrase. It uses its own random
+    stream, so the same seed plants the same faults with or without paraphrasing."""
 
     def want(name: str, p: float) -> bool:
         return rng.random() < p if faults is None else name in faults
 
     sc = SCRIPTS[agent_id]
     steps = [(sid, rng.choice(a), rng.choice(u)) for sid, a, u in sc["steps"]]
+    if paraphrase:
+        pool, prng = _paraphrases()[agent_id], random.Random(f"{agent_id}-{n}-{call_id}")
+        steps = [(sid, prng.choice(pool[sid]) + ("?" if "?" in a else ""), u) if sid in pool else (sid, a, u)
+                 for sid, a, u in steps]
     labels: list[str] = []
     planted: list[str] = []
     ended_by = "agent"
@@ -238,9 +253,9 @@ def make_call(agent_id: str, n: int, rng: random.Random, faults: set[str] | None
                   sorted(set(labels)), planted)
 
 
-def generate(n_per_agent: int = 60, seed: int = 7) -> list[Sample]:
+def generate(n_per_agent: int = 60, seed: int = 7, paraphrase: bool = False) -> list[Sample]:
     rng = random.Random(seed)
-    return [make_call(agent_id, n, rng) for agent_id in SCRIPTS for n in range(n_per_agent)]
+    return [make_call(agent_id, n, rng, paraphrase=paraphrase) for agent_id in SCRIPTS for n in range(n_per_agent)]
 
 
 def save(samples: list[Sample], path: str | Path) -> None:

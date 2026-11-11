@@ -1,0 +1,79 @@
+# HELD-OUT test set. Never used for training. Written separately from the training file,
+# phrased differently on purpose, and checked by a test to share no sentence with it.
+# Most of these do NOT contain the spec's match phrases, which is the point:
+# they show what phrase rules miss and whether the trained model generalises.
+
+field-sales-screener:
+  greet:
+    - "Hello, Kaam Connect recruitment se Priya baat kar rahi hai"
+    - "Namaste, aapki naukri ki application ke silsile mein phone kiya"
+  consent:
+    - "Bata doon ki ye call record ki ja rahi hai quality ke liye"
+    - "Is phone call ki recording ho rahi hai, aapko theek hai"
+  role_interest:
+    - "Sales wali job mein aapki ruchi abhi bhi bani hui hai"
+    - "Aap field executive ki post ke liye abhi bhi ready ho"
+    - "Kya sales ka kaam abhi bhi karna chahte ho aap"
+  location:
+    - "Aap kahan se ho, matlab kis jagah rehte ho"
+    - "Abhi aap kidhar stay kar rahe ho"
+    - "Aapka ghar kaunse ilaake mein padta hai"
+  experience:
+    - "Sales line mein aap kitne saalon se ho"
+    - "Aapne ab tak kitne saal selling ka kaam kiya"
+    - "Pichli company mein sales kitne time kiya"
+  notice_period:
+    - "Aap humein join kab tak kar sakte ho"
+    - "Purani job chhod ke aane mein kitne din lagenge"
+    - "Kitne dino mein aap shuru kar paoge"
+  salary:
+    - "Abhi aapki kamai kitni hai mahine ki"
+    - "Current job aapko kitna pay karti hai"
+    - "Har mahine haath mein kitna aata hai"
+  interview_slot:
+    - "Kal gyarah baje office aake mil sakte ho interview ke liye"
+    - "Interview kab rakhein, kal ya parso"
+    - "Aapko interview ke liye kaunsa time theek lagega"
+  close:
+    - "Bahut dhanyavaad, details aapko message mein mil jayengi"
+    - "Shukriya aapka, aage ki jaankari SMS pe aayegi"
+  other:
+    - "Haan ji, ek minute"
+    - "Accha, samjhi"
+    - "Awaaz saaf nahi aa rahi"
+    - "Theek hai, aage badhte hain"
+
+rider-onboarding-hindi:
+  greet:
+    - "नमस्ते जी, काम कनेक्ट की rider team से राहुल बात कर रहा हूँ"
+    - "नमस्कार, आपकी delivery वाली application पर फ़ोन किया है"
+  consent:
+    - "जानकारी के लिए बता दूँ, कॉल रिकॉर्ड हो रही है"
+    - "इस बातचीत की रिकॉर्डिंग हो रही है, आपको ठीक है"
+  vehicle:
+    - "आपके पास खुद का दोपहिया है क्या"
+    - "डिलीवरी के लिए आपके पास अपनी मोटरसाइकिल है"
+    - "Aapke paas khud ki bike hai ya nahi"
+  licence:
+    - "गाड़ी चलाने का लाइसेंस आपके पास है"
+    - "आपका DL बना हुआ है"
+    - "Licence hai aapke paas gaadi chalane ka"
+  area:
+    - "आप किस जगह के आसपास काम करना चाहेंगे"
+    - "कौन सा इलाका आपके लिए सही रहेगा"
+    - "Aap kis jagah delivery karna pasand karoge"
+  availability:
+    - "आप हफ्ते के कितने दिन free रहते हैं"
+    - "रोज़ कितने घंटे काम कर सकेंगे आप"
+    - "Ek hafte mein kitne din kaam karoge"
+  app_link:
+    - "फ़ोन पर app का link भेजा है, उसे install कर लीजिए"
+    - "App ka link SMS mein bhej diya hai"
+  close:
+    - "बहुत शुक्रिया, आगे की जानकारी जल्द भेजेंगे"
+    - "धन्यवाद, आपसे फिर बात होगी"
+  other:
+    - "हाँ जी, एक सेकंड"
+    - "अच्छा, समझ गया"
+    - "आवाज़ साफ़ नहीं आ रही"
+    - "ठीक है, आगे चलते हैं"

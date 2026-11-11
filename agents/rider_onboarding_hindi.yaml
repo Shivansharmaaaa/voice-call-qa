@@ -6,6 +6,7 @@
 id: rider-onboarding-hindi
 name: Rider onboarding (Hindi only)
 persona: hindi_only
+step_matcher: hybrid  # phrase rules first, trained model for paraphrases (see ml/)
 allowed_english: ["bike", "driving licence", "delivery", "app", "otp", "link"]
 flow:
   - id: greet

@@ -5,6 +5,6 @@
   "outputDirectory": "web/dist",
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index" }],
   "functions": {
-    "api/index.py": { "includeFiles": "{callqa/**,agents/**}", "maxDuration": 30 }
+    "api/index.py": { "includeFiles": "{callqa/**,agents/**,ml/test_paraphrases.yaml}", "maxDuration": 30 }
   }
 }

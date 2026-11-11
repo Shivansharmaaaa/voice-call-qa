@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Agent, api, Benchmark, CHECK_LABEL } from "../api";
+import { Agent, api, Benchmark, CHECK_LABEL, Matcher, MATCHER_LABEL } from "../api";
 import { href } from "../router";
 
 const REPO = "https://github.com/Shivansharmaaaa/voice-call-qa";
@@ -14,7 +14,8 @@ export function Agents() {
       {agents.map((a) => (
         <section key={a.id} className="card">
           <h2>{a.name}</h2>
-          <p className="muted small">persona <b>{a.persona}</b>{a.allowed_english.length > 0 && <> · English words allowed: {a.allowed_english.join(", ")}</>}</p>
+          <p className="muted small">persona <b>{a.persona}</b> · steps recognised by <b>{MATCHER_LABEL[a.step_matcher]}</b>
+            {a.allowed_english.length > 0 && <> · English words allowed: {a.allowed_english.join(", ")}</>}</p>
           <div className="two">
             <div>
               <h4>Call flow</h4>
@@ -92,6 +93,45 @@ export function BenchmarkPage() {
               ))}
             </ul>
           </div>
+          <div className="card table-wrap">
+            <h3>Rules vs the trained model</h3>
+            <p className="muted small">Flow checks only (skipped step, order, early hang-up), on the same 120 fault plans with two kinds of
+              wording: the templates the rule phrases were written for, and held-out paraphrases that neither the rules nor the model saw.</p>
+            <table className="calls">
+              <thead><tr><th>Agent wording</th><th>Steps found by</th><th>Caught</th><th>False alarms</th><th>Missed</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
+              <tbody>
+                {(["template", "paraphrased"] as const).flatMap((ds) => (["phrase", "ml", "hybrid"] as Matcher[]).map((m) => {
+                  const r = b.matchers[ds][m];
+                  return (
+                    <tr key={ds + m}><td>{ds === "template" ? "Templates" : "Paraphrased"}</td><td>{MATCHER_LABEL[m]}</td>
+                      <td>{r.flow_tp}</td><td>{r.flow_fp}</td><td>{r.flow_fn}</td><td>{r.flow_precision.toFixed(2)}</td>
+                      <td>{r.flow_recall.toFixed(2)}</td><td><b>{r.flow_f1.toFixed(2)}</b></td></tr>
+                  );
+                }))}
+              </tbody>
+            </table>
+            <p className="small">On paraphrased calls the rules raise false "skipped step" alarms because the agent asked the question in
+              words the rules don't list. The model recognises most of them. On template calls, rules + model is as good as rules alone.</p>
+          </div>
+          <div className="card">
+            <h3>Model card</h3>
+            <div className="two">
+              {Object.entries(b.models).map(([agent, m]) => (
+                <dl key={agent} className="metrics">
+                  <div><dt>agent</dt><dd className="small">{agent}</dd></div>
+                  <div><dt>algorithm</dt><dd className="small">{m.algorithm}</dd></div>
+                  <div><dt>training sentences</dt><dd>{m.trained_sentences} (+{m.augmented_rows - m.trained_sentences} augmented)</dd></div>
+                  <div><dt>features</dt><dd>{m.features.toLocaleString()}</dd></div>
+                  <div><dt>5-fold CV accuracy</dt><dd>{Math.round(m.cv_accuracy * 100)}%</dd></div>
+                  <div><dt>held-out accuracy</dt><dd>{Math.round(m.heldout_accuracy * 100)}% of {m.heldout_sentences}</dd></div>
+                  <div><dt>confidence threshold</dt><dd>{m.threshold} (chosen by CV)</dd></div>
+                </dl>
+              ))}
+            </div>
+            <p className="muted small">Training and test sentences were both written by hand for this demo and the held-out set is small, so
+              treat these as a sanity check, not a production accuracy. The cross-validation score is lower than held-out accuracy because
+              each fold removes a fifth of an already small training set.</p>
+          </div>
           <div className="card note">
             <h3>Read these numbers carefully</h3>
             <p>The calls come from the same templates the match phrases were written for, so this shows the rules do what they claim. It is not a measure of real-world accuracy: real calls have paraphrases, accents and STT errors.</p>
@@ -116,6 +156,9 @@ export function About() {
         <h3>How it's built</h3>
         <ul>
           <li>Python rule engine: 7 checks, each a pure function over a transcript.</li>
+          <li>A trained step classifier (character n-gram TF-IDF + logistic regression, scikit-learn) that recognises paraphrased
+            and misspelled questions. It is exported to JSON and runs in plain Python on the server, with a test proving it gives
+            the same probabilities as scikit-learn.</li>
           <li>FastAPI service; the hosted demo runs as a serverless function and scores 120 synthetic calls in memory.</li>
           <li>Optional SQLAlchemy storage (SQLite or Postgres, both tested) when self-hosted.</li>
           <li>React + TypeScript front end.</li>
@@ -125,7 +168,8 @@ export function About() {
       <div className="card">
         <h3>Limits</h3>
         <ul>
-          <li>Phrase matching misses paraphrased questions. An embedding or LLM judge is the natural next step, measured against the same labels.</li>
+          <li>The step classifier is trained on about 150 hand-written sentences. It still confuses close steps (licence vs vehicle) and
+            would need real labelled calls to be trusted. A multilingual embedding model is the next step to compare against it.</li>
           <li>Transcripts only, no audio. Latency comes from timestamps.</li>
           <li>Language detection covers Hindi and English only.</li>
           <li>Synthetic data only; never tested on real calls.</li>

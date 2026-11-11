@@ -1,0 +1,31 @@
+{
+  "field-sales-screener": {
+    "trained_sentences": 85,
+    "augmented_rows": 340,
+    "features": 2522,
+    "cv_accuracy": 0.824,
+    "heldout_accuracy": 1.0,
+    "heldout_sentences": 28,
+    "threshold": 0.2,
+    "algorithm": "char 2-4-gram TF-IDF + logistic regression",
+    "heldout_mistakes": []
+  },
+  "rider-onboarding-hindi": {
+    "trained_sentences": 66,
+    "augmented_rows": 264,
+    "features": 2304,
+    "cv_accuracy": 0.653,
+    "heldout_accuracy": 0.958,
+    "heldout_sentences": 24,
+    "threshold": 0.25,
+    "algorithm": "char 2-4-gram TF-IDF + logistic regression",
+    "heldout_mistakes": [
+      {
+        "text": "Licence hai aapke paas gaadi chalane ka",
+        "true": "licence",
+        "predicted": "vehicle",
+        "p": 0.37
+      }
+    ]
+  }
+}
