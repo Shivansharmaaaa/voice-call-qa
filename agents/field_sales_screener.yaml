@@ -1,0 +1,34 @@
+# A Hinglish voice recruiter that screens candidates for field-sales roles.
+# Code-switching is part of this persona, so the language check is switched off here.
+id: field-sales-screener
+name: Field sales screener (Hinglish)
+persona: mixed
+flow:
+  - id: greet
+    match: ["namaste"]
+  - id: consent
+    match: ["record ho rahi"]
+  - id: role_interest
+    match: ["field sales"]
+  - id: location
+    match: ["kis area"]
+  - id: experience
+    match: ["experience"]
+  - id: notice_period
+    match: ["notice period"]
+  - id: salary
+    match: ["salary"]
+  - id: interview_slot
+    match: ["interview ka slot"]
+  - id: close
+    match: ["dhanyavaad"]
+compliance_lines:
+  - "yeh call quality ke liye record ho rahi hai"
+checks:
+  coverage: {weight: 3}
+  order: {weight: 1}
+  early_exit: {weight: 3}
+  one_question: {weight: 1, max_questions: 1}
+  repeats: {weight: 2, similarity: 0.85, min_tokens: 4}
+  language: {enabled: false}
+  latency: {weight: 1, max_gap_s: 2.0}

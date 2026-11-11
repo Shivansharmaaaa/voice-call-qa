@@ -1,0 +1,72 @@
+{
+  "calls": 120,
+  "per_finding": {
+    "coverage:skipped_step": {
+      "tp": 16,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "early_exit:early_exit": {
+      "tp": 22,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "language:off_persona": {
+      "tp": 15,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "latency:slow_response": {
+      "tp": 16,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "one_question:multiple_questions": {
+      "tp": 21,
+      "fp": 0,
+      "fn": 2,
+      "precision": 1.0,
+      "recall": 0.913
+    },
+    "order:out_of_order": {
+      "tp": 24,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "repeats:repeat": {
+      "tp": 18,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    }
+  },
+  "must_not_flag": {
+    "restart": {
+      "planted": 23,
+      "wrongly_flagged": 0
+    },
+    "caller_asked": {
+      "planted": 21,
+      "wrongly_flagged": 0
+    },
+    "compliance": {
+      "planted": 16,
+      "wrongly_flagged": 0
+    },
+    "hangup": {
+      "planted": 13,
+      "wrongly_flagged": 0
+    }
+  }
+}

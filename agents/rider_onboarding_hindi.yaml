@@ -1,0 +1,37 @@
+# A strictly Hindi voice agent that onboards delivery riders.
+# Here an English turn is a persona break, so the language check is on, with a short
+# list of English words riders expect to hear as-is. Steps also list English
+# phrases, so a step the agent asks in English still counts as asked (and is
+# flagged by the language check instead of looking skipped).
+id: rider-onboarding-hindi
+name: Rider onboarding (Hindi only)
+persona: hindi_only
+allowed_english: ["bike", "driving licence", "delivery", "app", "otp", "link"]
+flow:
+  - id: greet
+    match: ["नमस्ते"]
+  - id: consent
+    match: ["रिकॉर्ड की जा रही"]
+  - id: vehicle
+    match: ["अपनी bike", "own bike"]
+  - id: licence
+    match: ["driving licence"]
+  - id: area
+    match: ["किस इलाके", "which part of the city"]
+  - id: availability
+    match: ["कितने दिन", "how many days"]
+  - id: app_link
+    required: false
+    match: ["app का link"]
+  - id: close
+    match: ["धन्यवाद"]
+compliance_lines:
+  - "यह कॉल गुणवत्ता के लिए रिकॉर्ड की जा रही है"
+checks:
+  coverage: {weight: 3}
+  order: {weight: 1}
+  early_exit: {weight: 3}
+  one_question: {weight: 1}
+  repeats: {weight: 2}
+  language: {weight: 2, max_off_share: 0.34, min_off_tokens: 3}
+  latency: {weight: 1, max_gap_s: 2.5}

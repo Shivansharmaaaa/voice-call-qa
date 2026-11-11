@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voice call QA</title><style>
+body{font-family:system-ui,sans-serif;margin:0 auto;max-width:960px;padding:16px;color:#1b1b1b;background:#fafaf7}
+section{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #eee;padding:6px;text-align:left}
+code{font-size:12px}</style></head><body><h1>Voice call QA</h1>
+<p>Synthetic demo data. Each agent shows only the checks its own spec turns on.</p>
+<section><h2>Field sales screener (Hinglish)</h2>
+<p>60 calls · persona <b>mixed</b> · mean score <b>84.2</b></p>
+<div class="grid"><table><tr><th>check (only this agent's)</th><th>calls failing</th></tr><tr><td>coverage</td><td>12%</td></tr><tr><td>order</td><td>22%</td></tr><tr><td>early_exit</td><td>20%</td></tr><tr><td>one_question</td><td>23%</td></tr><tr><td>repeats</td><td>10%</td></tr><tr><td>latency</td><td>13%</td></tr></table>
+<table><tr><th>metric</th><th>average</th></tr><tr><td>gap_p50_s</td><td>0.908</td></tr><tr><td>gap_p95_s</td><td>1.478</td></tr><tr><td>punctuated_agent_turns</td><td>0.913</td></tr><tr><td>repeat_rate</td><td>0.011</td></tr><tr><td>step_coverage</td><td>0.863</td></tr></table></div>
+<p>Most skipped steps: role_interest (3), location (2), notice_period (2)</p><p>Lowest-scoring calls: <code>field-sales-screener-046</code> 54.5, <code>field-sales-screener-005</code> 63.6, <code>field-sales-screener-013</code> 63.6, <code>field-sales-screener-015</code> 63.6, <code>field-sales-screener-019</code> 63.6</p></section>
+<section><h2>Rider onboarding (Hindi only)</h2>
+<p>60 calls · persona <b>hindi_only</b> · mean score <b>82.4</b></p>
+<div class="grid"><table><tr><th>check (only this agent's)</th><th>calls failing</th></tr><tr><td>coverage</td><td>15%</td></tr><tr><td>order</td><td>18%</td></tr><tr><td>early_exit</td><td>17%</td></tr><tr><td>one_question</td><td>12%</td></tr><tr><td>repeats</td><td>20%</td></tr><tr><td>language</td><td>25%</td></tr><tr><td>latency</td><td>13%</td></tr></table>
+<table><tr><th>metric</th><th>average</th></tr><tr><td>agent_hindi_share</td><td>0.968</td></tr><tr><td>gap_p50_s</td><td>0.922</td></tr><tr><td>gap_p95_s</td><td>1.489</td></tr><tr><td>punctuated_agent_turns</td><td>0.816</td></tr><tr><td>repeat_rate</td><td>0.025</td></tr><tr><td>step_coverage</td><td>0.902</td></tr></table></div>
+<p>Most skipped steps: availability (4), area (3), licence (2)</p><p>Lowest-scoring calls: <code>rider-onboarding-hindi-006</code> 46.2, <code>rider-onboarding-hindi-009</code> 53.8, <code>rider-onboarding-hindi-015</code> 53.8, <code>rider-onboarding-hindi-011</code> 61.5, <code>rider-onboarding-hindi-026</code> 61.5</p></section></body></html>
